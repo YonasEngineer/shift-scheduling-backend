@@ -34,6 +34,8 @@ model User {
   notifications      Notifications[]
   userPreferences    UserPreferences?
   auditLogs          AuditLogs[]
+  schedules          Schedule[]
+  userWeeklyStats    UserWeeklyStats[]
 
   @@map("users")
 }
@@ -63,6 +65,7 @@ model Location {
   // Relations (optional, if you already have UserLocation)
   userLocations UserLocation[]
   shifts        Shifts[]
+  schedules     Schedule[]
 
   @@map("locations")
 }
@@ -95,8 +98,8 @@ model AvailabilityRecurring {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   dayOfWeek Int      @map("day_of_week")
-  startTime DateTime @map("start_time")
-  endTime   DateTime @map("end_time")
+  startTime DateTime @map("start_time") @db.Time
+  endTime   DateTime @map("end_time") @db.Time
   timezone  String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -110,8 +113,8 @@ model AvailabilityException {
   id          String   @id @default(uuid())
   userId      String
   date        DateTime
-  startTime   DateTime
-  endTime     DateTime
+  startTime   DateTime @db.Time
+  endTime     DateTime @db.Time
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -123,27 +126,42 @@ model AvailabilityException {
 }
 
 model Shifts {
-  id                String      @id @default(uuid())
+  id                String             @id @default(uuid())
   locationId        String
-  startTime         DateTime    @db.Timestamptz
-  endTime           DateTime    @db.Timestamptz
+  startTime         DateTime           @db.Timestamptz
+  endTime           DateTime           @db.Timestamptz
   requiredSkillId   String
   requiredHeadcount Int
   createdBy         String
-  status            ShiftStatus @default(DRAFT)
-  isPremium         Boolean     @default(false)
-  createdAt         DateTime    @default(now()) @map("created_at")
-  updatedAt         DateTime    @updatedAt @map("updated_at")
-
-  location         Location           @relation(fields: [locationId], references: [id])
-  requiredSkill    Skill              @relation(fields: [requiredSkillId], references: [id])
-  creator          User               @relation(fields: [createdBy], references: [id])
-  shiftAssignments ShiftAssignments[]
-  swapRequests     SwapRequests[]
-  workLogs         WorkLogs[]
+  status            ShiftStatus        @default(DRAFT)
+  isPremium         Boolean            @default(false)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  scheduleId        String?
+  schedule          Schedule?          @relation(fields: [scheduleId], references: [id])
+  location          Location           @relation(fields: [locationId], references: [id])
+  requiredSkill     Skill              @relation(fields: [requiredSkillId], references: [id])
+  creator           User               @relation(fields: [createdBy], references: [id])
+  shiftAssignments  ShiftAssignments[]
+  swapRequests      SwapRequests[]
+  workLogs          WorkLogs[]
 
   @@index([locationId, startTime])
   @@map("shifts")
+}
+
+model Schedule {
+  id                 String         @id @default(uuid())
+  locationId         String
+  weekStart          DateTime
+  status             ScheduleStatus @default(DRAFT)
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+  createdBy          String
+  publishCutoffHours Int            @default(48)
+  location           Location       @relation(fields: [locationId], references: [id])
+  creator            User           @relation(fields: [createdBy], references: [id])
+  shifts             Shifts[]
 }
 
 model ShiftAssignments {
@@ -173,13 +191,27 @@ model SwapRequests {
   expiresAt    DateTime //  You’ll need a cron job / worker  Automatically set: status = EXPIRED   When expiresAt < now()
   createdAt    DateTime          @default(now()) @map("created_at")
   updatedAt    DateTime          @updatedAt @map("updated_at")
-
-  shift      Shifts @relation(fields: [shiftId], references: [id])
-  requester  User   @relation("SwapRequester", fields: [requesterId], references: [id])
-  targetUser User?  @relation("SwapTarget", fields: [targetUserId], references: [id])
+  approvedBy   String?
+  approvedAt   DateTime?
+  shift        Shifts            @relation(fields: [shiftId], references: [id])
+  requester    User              @relation("SwapRequester", fields: [requesterId], references: [id])
+  targetUser   User?             @relation("SwapTarget", fields: [targetUserId], references: [id])
 
   @@index([status, expiresAt])
   @@map("swap_requests")
+}
+
+model UserWeeklyStats {
+  id            String   @id @default(uuid())
+  userId        String
+  weekStart     DateTime
+  totalHours    Float
+  overtimeHours Float
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, weekStart])
 }
 
 model WorkLogs {
@@ -198,11 +230,30 @@ model WorkLogs {
   @@map("work_logs")
 }
 
+model AuditLogs {
+  id          String      @id @default(uuid())
+  entityType  EntityType
+  entityId    String
+  action      AuditAction
+  beforeData  Json?
+  afterData   Json?
+  // ipAddress   String?
+  performedBy String
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  user        User        @relation(fields: [performedBy], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([performedBy, createdAt])
+  @@map("audit_logs")
+}
+
 model Notifications {
   id        String           @id @default(uuid())
   userId    String
   type      NotificationType
   title     String
+  metadata  Json?
   message   String
   isRead    Boolean          @default(false)
   createdAt DateTime         @default(now()) @map("created_at")
@@ -222,23 +273,6 @@ model UserPreferences {
   user                User     @relation(fields: [userId], references: [id])
 
   @@map("user_preferences")
-}
-
-model AuditLogs {
-  id          String      @id @default(uuid())
-  entityType  EntityType
-  entityId    String
-  action      AuditAction
-  beforeData  Json?
-  afterData   Json?
-  performedBy String
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  user        User        @relation(fields: [performedBy], references: [id])
-
-  @@index([entityType, entityId])
-  @@index([performedBy, createdAt])
-  @@map("audit_logs")
 }
 
 enum NotificationType {
@@ -273,15 +307,24 @@ enum UserLocationRole {
   STAFF
 }
 
+enum ScheduleStatus {
+  DRAFT
+  PUBLISHED
+}
+
 enum ShiftStatus {
   DRAFT
   PUBLISHED
+  CANCELLED
+  COMPLETED
 }
 
 enum AssignmentStatus {
   ASSIGNED
   PENDING_SWAP
   DROPPED
+  CANCELLED
+  COMPLETED
 }
 
 enum SwapRequestType {
