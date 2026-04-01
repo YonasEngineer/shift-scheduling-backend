@@ -8,6 +8,7 @@ import { ScheduleModule } from './schedule/schedule.module.js';
 import { ShiftModule } from './shift/shift.module.js';
 import { SkillModule } from './skill/skill.module.js';
 import { StaffModule } from './staff/staff.module.js';
+import { SwampModule } from './swamp/swamp.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { StaffModule } from './staff/staff.module.js';
     ShiftModule,
     SkillModule,
     StaffModule,
+    SwampModule,
   ],
   controllers: [AppController],
   providers: [AppService],

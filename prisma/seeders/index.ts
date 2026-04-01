@@ -242,7 +242,7 @@ async function main() {
     data: [
       {
         userId: staff1.id,
-        dayOfWeek: 4,
+        dayOfWeek: 3,
         startTime: new Date(
           new Date().toISOString().split('T')[0] + 'T10:00:00Z',
         ),
@@ -264,7 +264,7 @@ async function main() {
       },
       {
         userId: staff3.id,
-        dayOfWeek: 3,
+        dayOfWeek: 4,
         startTime: new Date(
           new Date().toISOString().split('T')[0] + 'T10:00:00Z',
         ),

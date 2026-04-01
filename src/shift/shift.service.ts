@@ -56,7 +56,7 @@ export class ShiftService {
   }
 
   async getStaffAssignments(userId: string) {
-    return this.prisma.shiftAssignments.findMany({
+    return await this.prisma.shiftAssignments.findMany({
       where: {
         userId,
       },
