@@ -242,23 +242,35 @@ async function main() {
     data: [
       {
         userId: staff1.id,
-        dayOfWeek: 1,
-        startTime: new Date('1970-01-01T09:00:00Z'),
-        endTime: new Date('1970-01-01T17:00:00Z'),
+        dayOfWeek: 4,
+        startTime: new Date(
+          new Date().toISOString().split('T')[0] + 'T10:00:00Z',
+        ),
+        endTime: new Date(
+          new Date().toISOString().split('T')[0] + 'T17:00:00Z',
+        ),
         timezone: 'America/Los_Angeles',
       },
       {
         userId: staff2.id,
-        dayOfWeek: 2,
-        startTime: new Date('1970-01-01T10:00:00Z'),
-        endTime: new Date('1970-01-01T18:00:00Z'),
+        dayOfWeek: 3,
+        startTime: new Date(
+          new Date().toISOString().split('T')[0] + 'T10:00:00Z',
+        ),
+        endTime: new Date(
+          new Date().toISOString().split('T')[0] + 'T17:00:00Z',
+        ),
         timezone: 'America/Los_Angeles',
       },
       {
         userId: staff3.id,
-        dayOfWeek: 1,
-        startTime: new Date('1970-01-01T12:00:00Z'),
-        endTime: new Date('1970-01-01T20:00:00Z'),
+        dayOfWeek: 3,
+        startTime: new Date(
+          new Date().toISOString().split('T')[0] + 'T10:00:00Z',
+        ),
+        endTime: new Date(
+          new Date().toISOString().split('T')[0] + 'T17:00:00Z',
+        ),
         timezone: 'America/New_York',
       },
     ],

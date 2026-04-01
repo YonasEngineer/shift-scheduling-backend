@@ -4,6 +4,10 @@ import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from './schedule/schedule.module.js';
+import { ShiftModule } from './shift/shift.module.js';
+import { SkillModule } from './skill/skill.module.js';
+import { StaffModule } from './staff/staff.module.js';
 
 @Module({
   imports: [
@@ -12,6 +16,10 @@ import { ConfigModule } from '@nestjs/config';
     }),
     AuthModule,
     PrismaModule,
+    ScheduleModule,
+    ShiftModule,
+    SkillModule,
+    StaffModule,
   ],
   controllers: [AppController],
   providers: [AppService],
