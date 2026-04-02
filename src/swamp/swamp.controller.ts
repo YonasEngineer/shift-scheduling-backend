@@ -1,5 +1,5 @@
 // swap.controller.ts
-import { Controller, Post, Get, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Patch } from '@nestjs/common';
 import { SwampService } from './swamp.service.js';
 import { CreateSwapDto } from './swamp.dto.js';
 
@@ -23,5 +23,10 @@ export class SwampController {
   @Get(':id')
   getSwap(@Param('id') id: string) {
     return this.swapService.getSwapById(id);
+  }
+
+  @Patch(':id')
+  acceptSwap(@Param('id') id: string, @Body('userId') userId: string) {
+    return this.swapService.acceptSwap(id, userId);
   }
 }

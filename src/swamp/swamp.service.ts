@@ -1,5 +1,9 @@
 // swap.service.ts
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateSwapDto } from './swamp.dto.js';
 // import { SwapRequestType } from 'generated/prisma/enums.js';
@@ -102,6 +106,70 @@ export class SwampService {
         requester: true,
         targetUser: true,
       },
+    });
+  }
+
+  async acceptSwap(swapId: string, targetUserId: string) {
+    // 1. Fetch the swap request with its details
+    const swap = await this.prisma.swapRequests.findUnique({
+      where: { id: swapId },
+      include: { shift: true },
+    });
+
+    if (!swap) throw new NotFoundException('Swap request not found');
+    if (swap.status !== 'PENDING')
+      throw new BadRequestException('Swap is no longer pending');
+
+    // Ensure the user accepting it is the intended target (if a target was specified)
+    if (swap.targetUserId && swap.targetUserId !== targetUserId) {
+      throw new BadRequestException(
+        'You are not the designated target for this swap',
+      );
+    }
+
+    // 2. Execute the swap in a Transaction
+    return this.prisma.$transaction(async (tx) => {
+      // A. Update the Swap Request status
+      const updatedSwap = await tx.swapRequests.update({
+        where: { id: swapId },
+        data: {
+          status: 'ACCEPTED',
+          approvedAt: new Date(),
+        },
+      });
+
+      // B. Remove the old assignment from the requester
+      await tx.shiftAssignments.delete({
+        where: {
+          shiftId_userId: {
+            shiftId: swap.shiftId,
+            userId: swap.requesterId,
+          },
+        },
+      });
+
+      // C. Create the new assignment for the target user
+      await tx.shiftAssignments.create({
+        data: {
+          shiftId: swap.shiftId,
+          userId: targetUserId,
+          status: 'ASSIGNED',
+        },
+      });
+
+      // D. (Optional) Invalidate other pending swaps for this specific shift assignment
+      // This prevents the same shift from being swapped multiple times simultaneously
+      await tx.swapRequests.updateMany({
+        where: {
+          shiftId: swap.shiftId,
+          requesterId: swap.requesterId,
+          status: 'PENDING',
+          id: { not: swapId },
+        },
+        data: { status: 'CANCELLED' },
+      });
+
+      return updatedSwap;
     });
   }
 }
