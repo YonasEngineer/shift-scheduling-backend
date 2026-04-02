@@ -6,14 +6,13 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'https://shift-scheduling-frontend-a8o7.vercel.app/',
+      'https://shift-scheduling-frontend-a8o7.vercel.app',
     ], // Allow all origins
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
 
     // credentials: true, // Allow credentials
   });
-  await app.listen(process.env.PORT ?? 3000, () => {
-    console.log('connected on port', process.env.PORT);
-  });
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
 }
 bootstrap();
