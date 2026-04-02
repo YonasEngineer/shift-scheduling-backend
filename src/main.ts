@@ -4,7 +4,10 @@ import { AppModule } from './app.module.js';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: ['*'], // Allow all origins
+    origin: [
+      'http://localhost:3000',
+      'https://shift-scheduling-frontend-a8o7.vercel.app/',
+    ], // Allow all origins
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
 
     // credentials: true, // Allow credentials
