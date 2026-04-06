@@ -7,6 +7,7 @@ import 'dotenv/config';
 import pkg from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
+// import { BadRequestException } from '@nestjs/common';
 
 // const prisma = new PrismaClient();
 const { Pool } = pkg;
@@ -23,6 +24,29 @@ const prisma = new PrismaClient({ adapter });
 
 const password = await bcrypt.hash('Test@123', 10);
 async function main() {
+  // const deleted = await prisma.swapRequests.deleteMany({});
+  // console.log('Deleted swap requests:', deleted.count);
+
+  // await prisma.shiftAssignments.updateMany({
+  //   where: { userId: '8a7feb97-1697-4fce-b9d2-200129ca5019' },
+  //   data: { status: 'ASSIGNED' },
+  // });
+  // console.log('assignment deleted');
+  // throw new BadRequestException();
+
+  // 🔥 0. CLEAN DATABASE FIRST
+  await prisma.userSkill.deleteMany();
+  await prisma.userLocation.deleteMany();
+  await prisma.availabilityException.deleteMany();
+  await prisma.availabilityRecurring.deleteMany();
+  await prisma.swapRequests.deleteMany();
+  await prisma.shiftAssignments.deleteMany();
+  await prisma.shifts.deleteMany();
+  await prisma.schedule.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.location.deleteMany();
+  await prisma.skill.deleteMany();
+  console.log('deleting completed');
   // =========================
   // 1. SKILLS
   // =========================
@@ -238,43 +262,80 @@ async function main() {
   // =========================
   // 6. AVAILABILITY (RECURRING)
   // =========================
+  // await prisma.availabilityRecurring.createMany({
+  //   data: [
+  //     {
+  //       userId: staff1.id,
+  //       dayOfWeek: 3,
+  //       startTime: new Date('1970-01-01T14:00:00Z'), // 2pm  local, Prisma wants a Date object to extract the time
+  //       endTime: new Date('1970-01-01T17:00:00Z'), // 5pm local
+  //       timezone: 'America/Los_Angeles',
+  //     },
+  //     {
+  //       userId: staff2.id,
+  //       dayOfWeek: 3,
+  //       startTime: new Date('1970-01-01T18:00:00Z'), // 6pm local
+  //       endTime: new Date('1970-01-01T20:00:00Z'), // 8pm local
+  //       timezone: 'America/Los_Angeles',
+  //     },
+  //     {
+  //       userId: staff3.id,
+  //       dayOfWeek: 4,
+  //       startTime: new Date('1970-01-01T21:00:00Z'), // 9pm local
+  //       endTime: new Date('1970-01-01T23:00:00Z'), // 11pm local
+  //       timezone: 'America/New_York',
+  //     },
+  //   ],
+  // });
+  // =========================
+  // 6. AVAILABILITY (RECURRING)
+  // =========================
   await prisma.availabilityRecurring.createMany({
     data: [
       {
         userId: staff1.id,
-        dayOfWeek: 3,
-        startTime: new Date(
-          new Date().toISOString().split('T')[0] + 'T10:00:00Z',
-        ),
-        endTime: new Date(
-          new Date().toISOString().split('T')[0] + 'T17:00:00Z',
-        ),
+        dayOfWeek: 1,
+        startTime: '11:00', // 11:00 AM
+        endTime: '18:00', // 6:00 PM
         timezone: 'America/Los_Angeles',
       },
       {
         userId: staff2.id,
-        dayOfWeek: 3,
-        startTime: new Date(
-          new Date().toISOString().split('T')[0] + 'T10:00:00Z',
-        ),
-        endTime: new Date(
-          new Date().toISOString().split('T')[0] + 'T17:00:00Z',
-        ),
+        dayOfWeek: 1,
+        startTime: '11:00', // 11:00 AM
+        endTime: '20:00', // 8:00 PM
         timezone: 'America/Los_Angeles',
       },
       {
         userId: staff3.id,
-        dayOfWeek: 4,
-        startTime: new Date(
-          new Date().toISOString().split('T')[0] + 'T10:00:00Z',
-        ),
-        endTime: new Date(
-          new Date().toISOString().split('T')[0] + 'T17:00:00Z',
-        ),
+        dayOfWeek: 1,
+        startTime: '21:00', // 9:00 PM
+        endTime: '23:00', // 11:00 PM
         timezone: 'America/New_York',
       },
     ],
   });
+  // =========================
+  // 7. AVAILABILITY EXCEPTIONS
+  // =========================
+  // await prisma.availabilityException.createMany({
+  //   data: [
+  //     {
+  //       userId: staff1.id,
+  //       date: new Date('2026-04-08'),
+  //       startTime: new Date('1970-01-01T18:00:00Z'), // 6 PM Local
+  //       endTime: new Date('1970-01-01T20:00:00Z'), // 8 PM Local
+  //       isAvailable: false,
+  //     },
+  //     {
+  //       userId: staff2.id,
+  //       date: new Date('2026-04-09'),
+  //       startTime: new Date('1970-01-01T14:00:00Z'), // 2 PM Local
+  //       endTime: new Date('1970-01-01T17:00:00Z'), // 5 PM Local
+  //       isAvailable: false,
+  //     },
+  //   ],
+  // });
 
   // =========================
   // 7. AVAILABILITY EXCEPTIONS
@@ -284,20 +345,19 @@ async function main() {
       {
         userId: staff1.id,
         date: new Date('2026-04-08'),
-        startTime: new Date('1970-01-01T00:00:00Z'),
-        endTime: new Date('1970-01-01T23:59:59Z'),
-        isAvailable: false, // full day off (sick/vacation)
+        startTime: '18:00',
+        endTime: '20:00',
+        isAvailable: false,
       },
       {
         userId: staff2.id,
         date: new Date('2026-04-09'),
-        startTime: new Date('1970-01-01T14:00:00Z'),
-        endTime: new Date('1970-01-01T18:00:00Z'),
-        isAvailable: true, // partial override availability
+        startTime: '14:00',
+        endTime: '17"00',
+        isAvailable: false,
       },
     ],
   });
-
   console.log('Seed completed successfully (core entities only)');
 }
 

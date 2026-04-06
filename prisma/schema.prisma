@@ -13,29 +13,29 @@ datasource db {
 }
 
 model User {
-  id                 String                  @id @default(uuid())
-  firstName          String                  @map("first_name")
-  lastName           String                  @map("last_name")
-  email              String                  @unique
-  passwordHash       String                  @map("password_hash")
-  role               Role
-  isActive           Boolean                 @default(true) @map("is_active")
-  createdAt          DateTime                @default(now()) @map("created_at")
-  updatedAt          DateTime                @updatedAt @map("updated_at")
-  userLocations      UserLocation[]
-  userSkills         UserSkill[]
-  userAvailabilities AvailabilityRecurring[]
-  availabilities     AvailabilityException[]
-  shifts             Shifts[]
-  shiftAssignments   ShiftAssignments[]
-  requestedSwaps     SwapRequests[]          @relation("SwapRequester")
-  targetedSwaps      SwapRequests[]          @relation("SwapTarget")
-  workLogs           WorkLogs[]
-  notifications      Notifications[]
-  userPreferences    UserPreferences?
-  auditLogs          AuditLogs[]
-  schedules          Schedule[]
-  userWeeklyStats    UserWeeklyStats[]
+  id                      String                  @id @default(uuid())
+  firstName               String                  @map("first_name")
+  lastName                String                  @map("last_name")
+  email                   String                  @unique
+  passwordHash            String                  @map("password_hash")
+  role                    Role
+  isActive                Boolean                 @default(true) @map("is_active")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+  userLocations           UserLocation[]
+  userSkills              UserSkill[]
+  recurringAvailabilities AvailabilityRecurring[]
+  availabilityExceptions  AvailabilityException[]
+  shifts                  Shifts[]
+  shiftAssignments        ShiftAssignments[]
+  requestedSwaps          SwapRequests[]          @relation("SwapRequester")
+  targetedSwaps           SwapRequests[]          @relation("SwapTarget")
+  workLogs                WorkLogs[]
+  notifications           Notifications[]
+  userPreferences         UserPreferences?
+  auditLogs               AuditLogs[]
+  schedules               Schedule[]
+  userWeeklyStats         UserWeeklyStats[]
 
   @@map("users")
 }
@@ -98,8 +98,10 @@ model AvailabilityRecurring {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   dayOfWeek Int      @map("day_of_week")
-  startTime DateTime @map("start_time") @db.Time
-  endTime   DateTime @map("end_time") @db.Time
+  // startTime DateTime @map("start_time") @db.Time
+  // endTime   DateTime @map("end_time") @db.Time
+  startTime String
+  endTime   String
   timezone  String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -113,8 +115,11 @@ model AvailabilityException {
   id          String   @id @default(uuid())
   userId      String
   date        DateTime
-  startTime   DateTime @db.Time
-  endTime     DateTime @db.Time
+  // timezone    String // we need time zone
+  // startTime   DateTime @db.Time
+  // endTime     DateTime @db.
+  startTime   String
+  endTime     String
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -182,20 +187,25 @@ model ShiftAssignments {
 }
 
 model SwapRequests {
-  id           String            @id @default(uuid())
-  shiftId      String
-  requesterId  String
-  targetUserId String?
-  type         SwapRequestType
-  status       SwapRequestStatus @default(PENDING)
-  expiresAt    DateTime //  You’ll need a cron job / worker  Automatically set: status = EXPIRED   When expiresAt < now()
-  createdAt    DateTime          @default(now()) @map("created_at")
-  updatedAt    DateTime          @updatedAt @map("updated_at")
-  approvedBy   String?
-  approvedAt   DateTime?
-  shift        Shifts            @relation(fields: [shiftId], references: [id])
-  requester    User              @relation("SwapRequester", fields: [requesterId], references: [id])
-  targetUser   User?             @relation("SwapTarget", fields: [targetUserId], references: [id])
+  id              String            @id @default(uuid())
+  shiftId         String
+  requesterId     String
+  targetUserId    String?
+  type            SwapRequestType
+  status          SwapRequestStatus @default(PENDING)
+  managerStatus   SwapManagerStatus @default(PENDING)
+  expiresAt       DateTime? //  You’ll need a cron job / worker  Automatically set: status = EXPIRED   When expiresAt < now()
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  // approvedBy    String?
+  // approvedAt    DateTime?
+  // Neutral "Decision" fields
+  processedById   String?           @map("processed_by_id")
+  processedAt     DateTime?         @map("processed_at")
+  rejectionReason String?           @map("rejection_reason") // Critical for staff morale!
+  shift           Shifts            @relation(fields: [shiftId], references: [id])
+  requester       User              @relation("SwapRequester", fields: [requesterId], references: [id])
+  targetUser      User?             @relation("SwapTarget", fields: [targetUserId], references: [id])
 
   @@index([status, expiresAt])
   @@map("swap_requests")
@@ -310,6 +320,8 @@ enum UserLocationRole {
 enum ScheduleStatus {
   DRAFT
   PUBLISHED
+  CANCELLED
+  COMPLETED
 }
 
 enum ShiftStatus {
@@ -322,9 +334,10 @@ enum ShiftStatus {
 enum AssignmentStatus {
   ASSIGNED
   PENDING_SWAP
-  DROPPED
-  CANCELLED
-  COMPLETED
+  PENDING_DROPPED
+  COMPLETED_SWAP
+  COMPLETED_DROPPED
+  // CANCELLED
 }
 
 enum SwapRequestType {
@@ -338,4 +351,10 @@ enum SwapRequestStatus {
   REJECTED
   CANCELLED
   EXPIRED
+}
+
+enum SwapManagerStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

@@ -9,11 +9,13 @@ import { ShiftModule } from './shift/shift.module.js';
 import { SkillModule } from './skill/skill.module.js';
 import { StaffModule } from './staff/staff.module.js';
 import { SwampModule } from './swamp/swamp.module.js';
+import { LocationModule } from './location/location.module.js';
+import { SocketModule } from './socket/socket.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // ✅ important
+      isGlobal: true, // important
     }),
     AuthModule,
     PrismaModule,
@@ -22,6 +24,8 @@ import { SwampModule } from './swamp/swamp.module.js';
     SkillModule,
     StaffModule,
     SwampModule,
+    LocationModule,
+    SocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -14,6 +14,7 @@ export class SwampService {
 
   // CREATE SWAP
   async createSwap(userId: string, dto: CreateSwapDto) {
+    console.log('see the swamp dto', dto);
     const { shiftId, type, targetUserId } = dto;
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -30,7 +31,7 @@ export class SwampService {
         shiftId_userId: { shiftId, userId },
       },
     });
-
+    console.log('see the assignment', assignment);
     if (!assignment) {
       throw new BadRequestException('You are not assigned to this shift');
     }
@@ -57,7 +58,7 @@ export class SwampService {
     }
 
     //  Update assignment
-    await this.prisma.shiftAssignments.update({
+    const assignement = await this.prisma.shiftAssignments.update({
       where: {
         shiftId_userId: { shiftId, userId },
       },
@@ -65,7 +66,7 @@ export class SwampService {
         status: 'PENDING_SWAP',
       },
     });
-
+    console.log('see the  assignement', assignement);
     //  Create swap
     const result = this.prisma.swapRequests.create({
       data: {
@@ -73,10 +74,10 @@ export class SwampService {
         requesterId: userId,
         targetUserId: targetUserId || null,
         type,
-        expiresAt,
+        expiresAt: type === 'DROP' ? expiresAt : null,
       },
     });
-    // console.log('see the result', result);
+    console.log('see the result', result);
     return result;
   }
 
@@ -84,7 +85,13 @@ export class SwampService {
   async getMySwaps(userId: string) {
     return this.prisma.swapRequests.findMany({
       where: {
-        OR: [{ requesterId: userId }, { targetUserId: userId }],
+        targetUserId: userId,
+        // status: {
+        //   in: ['ACCEPTED', 'REJECTED', 'PENDING'],
+        // },
+        // managerStatus: {
+        //   notIn: ['APPROVED', 'REJECTED'],
+        // },
       },
       include: {
         shift: true,
@@ -95,6 +102,25 @@ export class SwampService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async swampNeedingApproval(locationId: string) {
+    const swapRequest = await this.prisma.swapRequests.findMany({
+      where: {
+        status: 'ACCEPTED',
+        processedAt: null,
+        shift: {
+          locationId: locationId,
+        },
+      },
+      include: {
+        shift: true,
+        requester: true,
+        targetUser: true,
+      },
+    });
+    console.log('see the swapRequest ', swapRequest);
+    return swapRequest;
   }
 
   //  GET SINGLE SWAP
@@ -109,13 +135,93 @@ export class SwampService {
     });
   }
 
-  async acceptSwap(swapId: string, targetUserId: string) {
+  async managerRejectSwap(swapId: string, managerId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const swap = await tx.swapRequests.findUnique({
+        where: { id: swapId },
+      });
+
+      if (!swap) throw new NotFoundException();
+
+      // revert assignment back
+      await tx.shiftAssignments.update({
+        where: {
+          shiftId_userId: {
+            shiftId: swap.shiftId,
+            userId: swap.requesterId,
+          },
+        },
+        data: {
+          status: 'ASSIGNED',
+        },
+      });
+
+      const result = await tx.swapRequests.update({
+        where: { id: swapId },
+        data: {
+          processedById: managerId,
+          processedAt: new Date(),
+          managerStatus: 'REJECTED',
+        },
+      });
+      console.log('see the updated  swapRequests', result);
+    });
+  }
+
+  async managerApproveSwap(swapId: string, managerId: string) {
+    // 1. Fetch the swap request with its details
+    return this.prisma.$transaction(async (tx) => {
+      const swap = await tx.swapRequests.findUnique({
+        where: { id: swapId },
+      });
+
+      if (!swap || !swap.targetUserId) {
+        throw new NotFoundException();
+      }
+
+      // 1. Update old assignment
+      await tx.shiftAssignments.update({
+        where: {
+          shiftId_userId: {
+            shiftId: swap.shiftId,
+            userId: swap.requesterId,
+          },
+        },
+        data: {
+          status: 'COMPLETED_SWAP',
+        },
+      });
+
+      // 2. Create new assignment
+      await tx.shiftAssignments.create({
+        data: {
+          shiftId: swap.shiftId,
+          userId: swap.targetUserId,
+          status: 'ASSIGNED',
+        },
+      });
+
+      // 3. Approve swap
+      return tx.swapRequests.update({
+        where: { id: swapId },
+        data: {
+          processedAt: new Date(),
+          processedById: managerId,
+          managerStatus: 'APPROVED',
+        },
+      });
+    });
+    // console.log('see the  shiftAssignment', shiftAssignment);
+    // console.log('see the updateSwapRequest', updateSwapRequest);
+  }
+
+  async staffAcceptSwap(swapId: string, targetUserId: string) {
     // 1. Fetch the swap request with its details
     const swap = await this.prisma.swapRequests.findUnique({
       where: { id: swapId },
       include: { shift: true },
     });
-
+    console.log('see the swamp', swap);
     if (!swap) throw new NotFoundException('Swap request not found');
     if (swap.status !== 'PENDING')
       throw new BadRequestException('Swap is no longer pending');
@@ -134,42 +240,57 @@ export class SwampService {
         where: { id: swapId },
         data: {
           status: 'ACCEPTED',
-          approvedAt: new Date(),
+          // processedAt: new Date(),
         },
       });
+      console.log('see the   updatedSwap', updatedSwap);
+      // C. Create the new assignment for the target user
 
-      // B. Remove the old assignment from the requester
-      await tx.shiftAssignments.delete({
+      // // console.log('see the updated  shiftAssignment', shiftAssignment);
+      // // (Optional) Invalidate other pending swaps for this specific shift assignment
+      // // This prevents the same shift from being swapped multiple times simultaneously
+      // await tx.swapRequests.updateMany({
+      //   where: {
+      //     shiftId: swap.shiftId,
+      //     requesterId: swap.requesterId,
+      //     status: 'PENDING',
+      //     id: { not: swapId },
+      //   },
+      //   data: { status: 'CANCELLED' },
+      // });
+
+      return updatedSwap;
+    });
+  }
+
+  async staffRejectSwap(swapId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const swap = await tx.swapRequests.findUnique({
+        where: { id: swapId },
+      });
+
+      if (!swap) throw new NotFoundException();
+
+      // revert assignment back
+      await tx.shiftAssignments.update({
         where: {
           shiftId_userId: {
             shiftId: swap.shiftId,
             userId: swap.requesterId,
           },
         },
-      });
-
-      // C. Create the new assignment for the target user
-      await tx.shiftAssignments.create({
         data: {
-          shiftId: swap.shiftId,
-          userId: targetUserId,
           status: 'ASSIGNED',
         },
       });
-
-      // D. (Optional) Invalidate other pending swaps for this specific shift assignment
-      // This prevents the same shift from being swapped multiple times simultaneously
-      await tx.swapRequests.updateMany({
-        where: {
-          shiftId: swap.shiftId,
-          requesterId: swap.requesterId,
-          status: 'PENDING',
-          id: { not: swapId },
+      const result = await tx.swapRequests.update({
+        where: { id: swapId },
+        data: {
+          status: 'REJECTED',
         },
-        data: { status: 'CANCELLED' },
       });
-
-      return updatedSwap;
+      console.log('see the updated swap request result ', result);
+      return result;
     });
   }
 }

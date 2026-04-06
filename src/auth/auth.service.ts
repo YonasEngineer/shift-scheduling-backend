@@ -9,7 +9,7 @@ type JwtPayload = {
   sub: string;
   email: string;
   role: string;
-  locationIds: string[];
+  // locationIds: string[];
 };
 
 //  User shape returned from validateUser (from DB)
@@ -62,7 +62,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
-      locationIds: user.userLocations.map((ul) => ul.locationId),
+      // locationIds: user.userLocations.map((ul) => ul.locationId),
     };
 
     return {

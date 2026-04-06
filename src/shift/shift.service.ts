@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { StaffGateway } from '../socket/staff.getway.js';
 
 @Injectable()
 export class ShiftService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+
+    private staffGateway: StaffGateway,
+  ) {}
 
   //  Create shift
   async create(data: {
@@ -20,25 +25,58 @@ export class ShiftService {
     console.log('see the assignedUserIds', assignedUserIds);
     console.log('see the shiftData', shiftData);
 
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Create shift
-      const shift = await tx.shifts.create({
-        data: shiftData,
-      });
-
-      // 2. Create assignments (if any)
-      if (assignedUserIds?.length) {
-        await tx.shiftAssignments.createMany({
-          data: assignedUserIds.map((userId) => ({
-            shiftId: shift.id,
-            userId,
-            status: 'ASSIGNED',
-          })),
+    const createdShift = await this.prisma.$transaction(
+      async (tx) => {
+        // 1. Create shift
+        const shift = await tx.shifts.create({
+          data: shiftData,
         });
-      }
 
-      return shift;
+        // 2. Create assignments (if any)
+        if (assignedUserIds?.length) {
+          await tx.shiftAssignments.createMany({
+            data: assignedUserIds.map((userId) => ({
+              shiftId: shift.id,
+              userId,
+              status: 'ASSIGNED',
+            })),
+          });
+        }
+
+        return shift;
+      },
+      { timeout: 50000 }, // 50s
+    );
+
+    const assignments = await this.prisma.shiftAssignments.findMany({
+      where: {
+        shiftId: createdShift.id,
+        userId: { in: assignedUserIds },
+      },
+      include: {
+        shift: {
+          include: {
+            location: true,
+            requiredSkill: true,
+            swapRequests: {
+              include: {
+                requester: true,
+                targetUser: true,
+              },
+            },
+          },
+        },
+      },
     });
+
+    for (const assignment of assignments) {
+      this.staffGateway.sendToStaff(
+        assignment.userId,
+        'shift-created',
+        assignment,
+      );
+    }
+    return createdShift;
   }
 
   // Get shifts by schedule
@@ -59,6 +97,11 @@ export class ShiftService {
     return await this.prisma.shiftAssignments.findMany({
       where: {
         userId,
+        status: {
+          in: ['ASSIGNED', 'PENDING_SWAP'],
+        },
+
+        // 'ASSIGNED',
       },
       include: {
         shift: {
@@ -67,22 +110,6 @@ export class ShiftService {
             requiredSkill: true,
 
             swapRequests: {
-              where: {
-                OR: [
-                  // DROP → visible to everyone
-                  {
-                    type: 'DROP',
-                    status: 'PENDING',
-                  },
-
-                  // SWAP → only if current user is target
-                  {
-                    type: 'SWAP',
-                    status: 'PENDING',
-                    targetUserId: userId,
-                  },
-                ],
-              },
               include: {
                 requester: true,
                 targetUser: true,
